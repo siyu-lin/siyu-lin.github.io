@@ -1,0 +1,39 @@
+name: Sync Calendar Feed
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download ICS feed
+        run: |
+          mkdir -p data
+          curl -fsSL \
+            "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I" \
+            -o data/calendar.ics
+
+      - name: Validate ICS
+        run: |
+          grep -q "BEGIN:VCALENDAR" data/calendar.ics
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet -- data/calendar.ics; then
+            echo "No calendar changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/calendar.ics
+          git commit -m "chore: sync calendar feed"
+          git push

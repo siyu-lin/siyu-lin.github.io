@@ -6,8 +6,9 @@ description: Doudou's blogging website
 
 
 
-baseurl: "/VLove-Site" # the subpath of your site, e.g. /blog
-url: "https://siyu-lin.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+# Custom domain is served from root, so baseurl must be empty.
+baseurl: "" # for project pages without a custom domain, set this to "/<repo-name>"
+url: "https://www.v-love.net" # custom domain
 color_scheme: auto # You can choose three modes auto, light, and dark. By default, the auto mode is set, which means the user can choose the light or dark mode themself.
 
 
@@ -98,13 +99,13 @@ paginate_path: "/page/:num"
 # Pages Path
 defaults:
   - scope:
-      path: '_pages'
+      path: 'pages'
     values:
       permalink: /:basename:output_ext
 
 
 include:
-  - _pages
+  - pages
 
 sass:
   sass_dir: _sass

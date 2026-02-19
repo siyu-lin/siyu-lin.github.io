@@ -1,0 +1,76 @@
+---
+layout: page
+title: Calendar
+permalink: /calendar/
+image: '/images/16.jpg'
+---
+
+<!-- <iframe src="https://v2-embednotion.com/Calendar-88a1094835d440c3ba4ed27e969bf1da?pvs=4"></iframe>  <style>  iframe { width: 100%; height: 800px; border: 2px solid #ccc; border-radius: 10px; padding: none; }  </style> -->
+
+
+<!-- FullCalendar global bundle (includes dayGrid/timeGrid/list/etc) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/main.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/index.global.min.js"></script>
+
+<!-- ICAL.js -->
+<script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+
+<style>
+  #calendar { max-width: 1100px; margin: 20px auto; }
+  #cal-status { max-width: 1100px; margin: 10px auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+
+<div id="cal-status">Loading calendar…</div>
+<div id="calendar"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const statusEl = document.getElementById('cal-status');
+  const calendarEl = document.getElementById('calendar');
+
+  // IMPORTANT: use https:// version of your iCloud "webcal://" link
+  const icsUrl = "https://REPLACE_WITH_YOUR_ICLOUD_PUBLISHED_LINK";
+
+  try {
+    statusEl.textContent = "Fetching calendar feed…";
+
+    const res = await fetch(icsUrl);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
+
+    const icsText = await res.text();
+    if (!icsText.includes("BEGIN:VCALENDAR")) {
+      throw new Error("Response did not look like an ICS feed (missing BEGIN:VCALENDAR).");
+    }
+
+    statusEl.textContent = "Parsing events…";
+
+    const jcalData = ICAL.parse(icsText);
+    const comp = new ICAL.Component(jcalData);
+    const vevents = comp.getAllSubcomponents("vevent");
+
+    const events = vevents.map(v => {
+      const e = new ICAL.Event(v);
+      return {
+        title: e.summary || "(no title)",
+        start: e.startDate.toJSDate(),
+        end: e.endDate ? e.endDate.toJSDate() : null,
+        allDay: e.startDate.isDate
+      };
+    });
+
+    statusEl.textContent = `Loaded ${events.length} events.`;
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: "dayGridMonth",
+      height: "auto",
+      events
+    });
+
+    calendar.render();
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent =
+      "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I" + err.message;
+  }
+});
+</script>

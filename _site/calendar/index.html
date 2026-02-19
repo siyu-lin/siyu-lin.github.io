@@ -262,67 +262,76 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
 
-  // IMPORTANT: use https:// version of your iCloud "webcal://" link
-  const icsUrl = "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I";
+  const icsDataUrl = "/data/calendar.ics";
+  const liveIcsUrl = "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I";
   let calendar = null;
+
+  const parseEventsFromIcs = (icsText) => {
+    const jcalData = ICAL.parse(icsText);
+    const comp = new ICAL.Component(jcalData);
+    const vevents = comp.getAllSubcomponents("vevent");
+    return vevents.map(v => {
+      const e = new ICAL.Event(v);
+      return {
+        title: e.summary || "(no title)",
+        start: e.startDate.toJSDate(),
+        end: e.endDate ? e.endDate.toJSDate() : null,
+        allDay: e.startDate.isDate,
+        extendedProps: {
+          description: e.description || "",
+          location: e.location || ""
+        }
+      };
+    });
+  };
+
+  async function fetchFirstValidIcs(sources) {
+    const errors = [];
+    for (const source of sources) {
+      try {
+        const res = await fetch(source.url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const text = await res.text();
+        if (!text.includes("BEGIN:VCALENDAR")) throw new Error("invalid ICS response");
+        return { text, label: source.label };
+      } catch (err) {
+        errors.push(`${source.label}: ${err.message}`);
+      }
+    }
+    throw new Error(`All fetch attempts failed. ${errors.join(" | ")}`);
+  }
 
   async function loadCalendar() {
     try {
-      statusEl.textContent = "Fetching calendar feed…";
+      statusEl.textContent = "Fetching calendar data…";
 
       const nonce = Date.now();
-      const directUrl = `${icsUrl}?_=${nonce}`;
+      const syncedUrl = `${icsDataUrl}?_=${nonce}`;
       const fetchStart = performance.now();
-      const attempts = [
-        { label: "iCloud", url: directUrl },
-        { label: "corsproxy.io", url: `https://corsproxy.io/?${encodeURIComponent(directUrl)}` },
-        { label: "allorigins.win", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}` }
-      ];
-
-      let icsText = "";
-      let sourceLabel = "";
-      const errors = [];
-
-      for (const attempt of attempts) {
-        try {
-          const res = await fetch(attempt.url, { cache: "no-store" });
-          if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-          const text = await res.text();
-          if (!text.includes("BEGIN:VCALENDAR")) {
-            throw new Error("invalid ICS response");
-          }
-          icsText = text;
-          sourceLabel = attempt.label;
-          break;
-        } catch (err) {
-          errors.push(`${attempt.label}: ${err.message}`);
-        }
-      }
-
-      if (!icsText) {
-        throw new Error(`All fetch attempts failed. ${errors.join(" | ")}`);
-      }
+      let icsInfo = await fetchFirstValidIcs([{ label: "synced feed", url: syncedUrl }]);
 
       const fetchMs = Math.round(performance.now() - fetchStart);
       statusEl.textContent = "Parsing events…";
+      let events = parseEventsFromIcs(icsInfo.text);
 
-      const jcalData = ICAL.parse(icsText);
-      const comp = new ICAL.Component(jcalData);
-      const vevents = comp.getAllSubcomponents("vevent");
-
-      const events = vevents.map(v => {
-        const e = new ICAL.Event(v);
-        return {
-          title: e.summary || "(no title)",
-          start: e.startDate.toJSDate(),
-          end: e.endDate ? e.endDate.toJSDate() : null,
-          allDay: e.startDate.isDate,
-          extendedProps: {
-            description: e.description || "",
-            location: e.location || ""
+      if (events.length === 0) {
+        const liveUrl = `${liveIcsUrl}?_=${nonce}`;
+        const liveSources = [
+          { label: "iCloud live", url: liveUrl },
+          { label: "corsproxy.io", url: `https://corsproxy.io/?${encodeURIComponent(liveUrl)}` },
+          { label: "allorigins.win", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(liveUrl)}` }
+        ];
+        try {
+          const liveInfo = await fetchFirstValidIcs(liveSources);
+          const liveEvents = parseEventsFromIcs(liveInfo.text);
+          if (liveEvents.length > 0) {
+            events = liveEvents;
+            icsInfo = liveInfo;
           }
-        };
-      });
+        } catch (_) {
+          // Keep using synced feed result if live fallbacks are blocked.
+        }
+      }
 
       if (!calendar) {
         calendar = new FullCalendar.Calendar(calendarEl, {
@@ -367,7 +376,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         calendar.addEventSource(events);
       }
 
-      statusEl.textContent = `Loaded ${events.length} events from ${sourceLabel} (fetch: ${fetchMs} ms, refresh every ${Math.round(refreshMs / 60000)} min).`;
+      const refreshMins = Math.round(refreshMs / 60000);
+      if (events.length === 0) {
+        statusEl.textContent = `Loaded 0 events from ${icsInfo.label}. Sync may be stale; check GitHub Actions 'Sync Calendar Feed'.`;
+      } else {
+        statusEl.textContent = `Loaded ${events.length} events from ${icsInfo.label} (fetch: ${fetchMs} ms, refresh every ${refreshMins} min).`;
+      }
     } catch (err) {
       console.error(err);
       statusEl.textContent = `Calendar failed to load: ${err.message}`;
@@ -399,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="col col-5 col-d-12">
           <div class="footer__author">
             <div class="footer__author-avatar">
-              <img class="lazy" data-src="./images/doudou.jpeg" alt="Doudou de Penguin">
+              <img class="lazy" data-src="/images/doudou.jpeg" alt="Doudou de Penguin">
             </div>
             <h3 class="footer__author-name">Doudou de Penguin</h3>
             <p class="footer__author-bio">I will share and record stories that I witnessed on this site.</p>

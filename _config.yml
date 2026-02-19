@@ -17,7 +17,7 @@ color_scheme: auto # You can choose three modes auto, light, and dark. By defaul
 author:
   author__name: Doudou de Penguin
   author__bio: I will share and record stories that I witnessed on this site.
-  author__avatar: './images/doudou.jpeg'
+  author__avatar: '/images/doudou.jpeg'
 
 social:
 - {icon: "ion-logo-twitter", link: "https://twitter.com"}
@@ -35,7 +35,7 @@ social:
 hero:
   hero__title: Doudou de Penguin
   hero__description: I will share and record stories that I witnessed on this site.
-  hero__image: './images/doudou.jpeg'
+  hero__image: '/images/doudou.jpeg'
 
 
 #-------------------------------

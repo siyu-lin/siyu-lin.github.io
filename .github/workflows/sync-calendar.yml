@@ -11,6 +11,8 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      ICLOUD_ICS_URL: ${{ secrets.ICLOUD_ICS_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,13 +20,21 @@ jobs:
       - name: Download ICS feed
         run: |
           mkdir -p data
+          URL="$ICLOUD_ICS_URL"
+          if [ -z "$URL" ]; then
+            URL="https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I"
+          fi
           curl -fsSL \
-            "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I" \
+            --retry 3 \
+            --retry-delay 2 \
+            -A "Mozilla/5.0" \
+            "$URL" \
             -o data/calendar.ics
 
       - name: Validate ICS
         run: |
           grep -q "BEGIN:VCALENDAR" data/calendar.ics
+          grep -q "BEGIN:VEVENT" data/calendar.ics
 
       - name: Commit changes
         run: |

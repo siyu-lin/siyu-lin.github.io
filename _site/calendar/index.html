@@ -272,25 +272,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const nonce = Date.now();
       const directUrl = `${icsUrl}?_=${nonce}`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
-
       const fetchStart = performance.now();
-      let res;
-      try {
-        res = await fetch(directUrl, { cache: "no-store" });
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
-      } catch (_) {
-        // iCloud ICS feeds are often blocked by browser CORS; retry via a proxy.
-        res = await fetch(proxyUrl, { cache: "no-store" });
-        if (!res.ok) throw new Error(`Fetch failed (proxy): ${res.status} ${res.statusText}`);
+      const attempts = [
+        { label: "iCloud", url: directUrl },
+        { label: "corsproxy.io", url: `https://corsproxy.io/?${encodeURIComponent(directUrl)}` },
+        { label: "allorigins.win", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}` }
+      ];
+
+      let icsText = "";
+      let sourceLabel = "";
+      const errors = [];
+
+      for (const attempt of attempts) {
+        try {
+          const res = await fetch(attempt.url, { cache: "no-store" });
+          if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+          const text = await res.text();
+          if (!text.includes("BEGIN:VCALENDAR")) {
+            throw new Error("invalid ICS response");
+          }
+          icsText = text;
+          sourceLabel = attempt.label;
+          break;
+        } catch (err) {
+          errors.push(`${attempt.label}: ${err.message}`);
+        }
       }
+
+      if (!icsText) {
+        throw new Error(`All fetch attempts failed. ${errors.join(" | ")}`);
+      }
+
       const fetchMs = Math.round(performance.now() - fetchStart);
-
-      const icsText = await res.text();
-      if (!icsText.includes("BEGIN:VCALENDAR")) {
-        throw new Error("Response did not look like an ICS feed (missing BEGIN:VCALENDAR).");
-      }
-
       statusEl.textContent = "Parsing events…";
 
       const jcalData = ICAL.parse(icsText);
@@ -354,7 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         calendar.addEventSource(events);
       }
 
-      statusEl.textContent = `Loaded ${events.length} events (fetch: ${fetchMs} ms, refresh every ${Math.round(refreshMs / 60000)} min).`;
+      statusEl.textContent = `Loaded ${events.length} events from ${sourceLabel} (fetch: ${fetchMs} ms, refresh every ${Math.round(refreshMs / 60000)} min).`;
     } catch (err) {
       console.error(err);
       statusEl.textContent = `Calendar failed to load: ${err.message}`;

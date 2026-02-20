@@ -5,8 +5,8 @@
         <description>Doudou&apos;s blogging website</description>
         <link>http://localhost:4000/</link>
         <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml"/>
-        <pubDate>Thu, 19 Feb 2026 14:22:31 -0800</pubDate>
-        <lastBuildDate>Thu, 19 Feb 2026 14:22:31 -0800</lastBuildDate>
+        <pubDate>Fri, 20 Feb 2026 15:08:16 -0800</pubDate>
+        <lastBuildDate>Fri, 20 Feb 2026 15:08:16 -0800</lastBuildDate>
         <generator>Jekyll v4.3.3</generator>
         
             <item>
@@ -58,6 +58,33 @@ Though struggling to find the way at the beginning, they managed to get to the t
                 <category>story</category>
                 
                 <category>birthday</category>
+                
+                
+            </item>
+        
+            <item>
+                <title>Quintet, then Tennis At the Net</title>
+                <description>&lt;h2 id=&quot;quintet&quot;&gt;Quintet&lt;/h2&gt;
+&lt;p&gt;What a performance from Binglun! Beautiful and confident! I enjoyed every single moment.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/images/20260201_Quintet/violin2.jpg&quot; alt=&quot;Violin&quot; /&gt;
+&lt;em&gt;Look at the earrings swaying with the music!&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;tennis-right-after&quot;&gt;Tennis Right After???&lt;/h2&gt;
+&lt;p&gt;I guess the two of them both wants to hit some tennis to relax their nerves. But they only brought racquets and balls with them! So they decided to head to the courts and play … dressed up!&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/images/20260201_Quintet/tennis.jpg&quot; alt=&quot;Tennis&quot; /&gt;
+&lt;em&gt;Mama, where’s your shoes!&lt;/em&gt;&lt;/p&gt;
+</description>
+                <pubDate>Sun, 01 Feb 2026 15:00:00 -0800</pubDate>
+                <link>http://localhost:4000/quintet-then-tennis-at-the-net</link>
+                <guid isPermaLink="true">http://localhost:4000/quintet-then-tennis-at-the-net</guid>
+                
+                <category>story</category>
+                
+                <category>tennis</category>
+                
+                <category>music</category>
                 
                 
             </item>

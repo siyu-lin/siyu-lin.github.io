@@ -17,7 +17,28 @@ image: '/images/16.jpg'
 
 <style>
   #calendar { max-width: 1100px; margin: 20px auto; }
-  #cal-status { max-width: 1100px; margin: 10px auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #cal-controls {
+    max-width: 1100px;
+    margin: 10px auto;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  #cal-status { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #cal-refresh {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #cal-refresh:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
   #event-details {
     max-width: 1100px;
     margin: 12px auto 0;
@@ -31,7 +52,10 @@ image: '/images/16.jpg'
   #event-details p { margin: 6px 0; white-space: pre-wrap; }
 </style>
 
-<div id="cal-status">Loading calendar…</div>
+<div id="cal-controls">
+  <div id="cal-status">Loading calendar…</div>
+  <button id="cal-refresh" type="button">Pull Latest Events</button>
+</div>
 <div id="calendar"></div>
 <div id="event-details"></div>
 
@@ -40,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const statusEl = document.getElementById('cal-status');
   const calendarEl = document.getElementById('calendar');
   const detailsEl = document.getElementById('event-details');
+  const refreshBtn = document.getElementById('cal-refresh');
   const refreshMs = 5 * 60 * 1000;
   const escapeHtml = (value) =>
     String(value)
@@ -50,8 +75,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replaceAll("'", "&#39;");
 
   const icsDataUrl = "{{ '/data/calendar.ics' | relative_url }}";
-  const liveIcsUrl = "c";
+  const liveIcsUrl = "https://p132-caldav.icloud.com/published/2/MTE2NTMwNTkyOTQxMTY1M2IrR2BWe0FSyuyKNNGlCHQLtmZXk5FRGOOabVbBZz2y7fUDNBL3Cptuyi9F9A03j8q4IjNMYhTojLlvKY36i-I";
   let calendar = null;
+  let loading = false;
 
   const parseEventsFromIcs = (icsText) => {
     const jcalData = ICAL.parse(icsText);
@@ -88,26 +114,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     throw new Error(`All fetch attempts failed. ${errors.join(" | ")}`);
   }
 
-  async function loadCalendar() {
+  async function loadCalendar(options = {}) {
+    if (loading) return;
+    loading = true;
+    const preferLive = Boolean(options.preferLive);
     try {
-      statusEl.textContent = "Fetching calendar data…";
+      if (options.manual) {
+        statusEl.textContent = "Pulling latest events…";
+      } else {
+        statusEl.textContent = "Fetching calendar data…";
+      }
+      refreshBtn.disabled = true;
 
       const nonce = Date.now();
       const syncedUrl = `${icsDataUrl}?_=${nonce}`;
       const fetchStart = performance.now();
-      let icsInfo = await fetchFirstValidIcs([{ label: "synced feed", url: syncedUrl }]);
+      const liveUrl = `${liveIcsUrl}?_=${nonce}`;
+      const liveSources = [
+        { label: "iCloud live", url: liveUrl },
+        { label: "corsproxy.io", url: `https://corsproxy.io/?${encodeURIComponent(liveUrl)}` },
+        { label: "allorigins.win", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(liveUrl)}` }
+      ];
+      const syncedSource = [{ label: "synced feed", url: syncedUrl }];
+      const initialSources = preferLive
+        ? [...liveSources, ...syncedSource]
+        : syncedSource;
+      let icsInfo = await fetchFirstValidIcs(initialSources);
 
       const fetchMs = Math.round(performance.now() - fetchStart);
       statusEl.textContent = "Parsing events…";
       let events = parseEventsFromIcs(icsInfo.text);
 
-      if (events.length === 0) {
-        const liveUrl = `${liveIcsUrl}?_=${nonce}`;
-        const liveSources = [
-          { label: "iCloud live", url: liveUrl },
-          { label: "corsproxy.io", url: `https://corsproxy.io/?${encodeURIComponent(liveUrl)}` },
-          { label: "allorigins.win", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(liveUrl)}` }
-        ];
+      if (events.length === 0 && icsInfo.label === "synced feed") {
         try {
           const liveInfo = await fetchFirstValidIcs(liveSources);
           const liveEvents = parseEventsFromIcs(liveInfo.text);
@@ -172,8 +210,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.error(err);
       statusEl.textContent = `Calendar failed to load: ${err.message}`;
+    } finally {
+      loading = false;
+      refreshBtn.disabled = false;
     }
   }
+
+  refreshBtn.addEventListener("click", async () => {
+    await loadCalendar({ preferLive: true, manual: true });
+  });
 
   await loadCalendar();
   setInterval(loadCalendar, refreshMs);
